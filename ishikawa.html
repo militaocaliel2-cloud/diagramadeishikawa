@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Ishikawa UPA - Dashboard & Gestão</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
+        .container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 1100px; margin: auto; }
+        h2 { text-align: center; color: #333; }
+        .chart-wrapper { width: 100%; height: 250px; margin-bottom: 20px; }
+        .category-box { border-left: 4px solid #007bff; padding: 10px; margin-bottom: 15px; background: #f9f9f9; }
+        .row { display: flex; gap: 8px; margin-bottom: 5px; align-items: center; flex-wrap: wrap; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .flex-grow { flex: 2; }
+        .controls { text-align: center; margin-top: 20px; }
+        button { padding: 10px 20px; cursor: pointer; border: none; border-radius: 5px; color: white; margin: 5px; font-weight: bold; }
+        .btn-save { background: #007bff; }
+        /* Seção do Dashboard de Histórico */
+        .history-section { margin-top: 40px; padding-top: 20px; border-top: 2px solid #ddd; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #eee; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Análise de Causa Raiz - UPA 24h</h2>
+    <div class="chart-wrapper"><canvas id="myChart"></canvas></div>
+
+    <label><strong>Problema Central:</strong></label>
+    <input type="text" id="efeito" style="width: 100%; margin-bottom: 20px;" placeholder="Ex: Aumento no tempo de espera da triagem">
+
+    <div id="form-container"></div>
+
+    <div class="controls">
+        <button onclick="salvarParaPlanilha()" class="btn-save">☁️ Salvar e Registrar na Nuvem</button>
+        <button onclick="carregarHistorico()" style="background: #6c757d;">🔄 Atualizar Histórico</button>
+    </div>
+
+    <div class="history-section">
+        <h3>Histórico de Ações (Direto da Planilha)</h3>
+        <table id="history-table">
+            <thead>
+                <tr><th>Data</th><th>Categoria</th><th>Causa</th><th>Ação</th><th>Status</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // URL do seu novo Google Apps Script
+    const API_URL = "https://script.google.com/macros/s/AKfycbwq18WnPIZIErKkZXWkGBzrjX8YdbhP-SEnuBh8TPlm-6M7nS8DtLHBT0TNVjZy0lZ1JQ/exec";
+    const cats = ["Método", "Mão de Obra", "Material", "Máquina", "Medida", "Meio Ambiente"];
+    const container = document.getElementById('form-container');
+    let chart;
+
+    // 1. Renderiza formulário
+    cats.forEach(cat => {
+        container.innerHTML += `
+            <div class="category-box" data-cat="${cat}">
+                <strong>${cat}</strong>
+                <div class="row">
+                    <input type="text" class="flex-grow causa" placeholder="Causa...">
+                    <input type="text" class="flex-grow acao" placeholder="Ação...">
+                    <input type="text" style="width: 80px;" class="resp" placeholder="Resp">
+                    <select class="status"><option>Pendente</option><option>Em Andamento</option><option>Concluído</option></select>
+                    <select class="impacto" onchange="atualizarGrafico()"><option value="0">Imp</option>${[1,2,3,4,5].map(i => `<option value="${i}">${i}</option>`).join('')}</select>
+                    <select class="urgencia" onchange="atualizarGrafico()"><option value="0">Urg</option>${[1,2,3,4,5].map(i => `<option value="${i}">${i}</option>`).join('')}</select>
+                </div>
+            </div>
+        `;
+    });
+
+    // 2. Gráfico
+    function atualizarGrafico() {
+        const impactos = Array.from(document.querySelectorAll('.impacto')).map(s => parseInt(s.value) || 0);
+        if (chart) chart.destroy();
+        chart = new Chart(document.getElementById('myChart').getContext('2d'), {
+            type: 'bar',
+            data: { labels: cats, datasets: [{ label: 'Nível de Impacto', data: impactos, backgroundColor: '#007bff' }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 5 } } }
+        });
+    }
+
+    // 3. Salvar na Nuvem
+    async function salvarParaPlanilha() {
+        const dataParaEnviar = Array.from(document.querySelectorAll('.category-box')).map(box => ({
+            data: new Date().toLocaleDateString(),
+            problema: document.getElementById('efeito').value,
+            categoria: box.dataset.cat,
+            causa: box.querySelector('.causa').value,
+            acao: box.querySelector('.acao').value,
+            responsavel: box.querySelector('.resp').value,
+            status: box.querySelector('.status').value
+        }));
+
+        await fetch(API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dataParaEnviar)
+        });
+        alert("Dados enviados para a planilha!");
+        carregarHistorico();
+    }
+
+   async function carregarHistorico() {
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz-sMO64HB2m840Pt_lOH8Id0l0g0IdJNj6MVKNMGDyoO6P7N5HlEwOXrYtJSUej6HIHA/exec";
+    const response = await fetch(SCRIPT_URL);
+    const data = await response.json();
+    
+    const tbody = document.querySelector('#history-table tbody');
+    tbody.innerHTML = '';
+    
+    data.forEach(item => {
+        tbody.innerHTML += `<tr>
+            <td>${item.data}</td><td>${item.cat}</td>
+            <td>${item.causa}</td><td>${item.acao}</td>
+            <td>
+                <select onchange="atualizarStatus(${item.id}, this.value)">
+                    <option ${item.status == 'Pendente' ? 'selected' : ''}>Pendente</option>
+                    <option ${item.status == 'Em Andamento' ? 'selected' : ''}>Em Andamento</option>
+                    <option ${item.status == 'Concluído' ? 'selected' : ''}>Concluído</option>
+                </select>
+            </td>
+        </tr>`;
+    });
+}
+
+async function atualizarStatus(id, novoStatus) {
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz-sMO64HB2m840Pt_lOH8Id0l0g0IdJNj6MVKNMGDyoO6P7N5HlEwOXrYtJSUej6HIHA/exec";
+    await fetch(SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ type: 'edit', id: id, status: novoStatus })
+    });
+    alert("Status atualizado!");
+}
+
+    // Inicialização
+    window.onload = () => {
+        atualizarGrafico();
+    };
+</script>
+
+<footer style="text-align: center; margin-top: 50px; padding: 20px; color: #666; font-size: 0.9em; border-top: 1px solid #ddd;">
+    <p>Desenvolvido por: <strong>militão tech solutions</strong></p>
+</footer>
+
+</body>
+</html>
