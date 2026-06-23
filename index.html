@@ -2,6 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ishikawa UPA - Dashboard & Gestão</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -16,11 +17,19 @@
         .controls { text-align: center; margin-top: 20px; }
         button { padding: 10px 20px; cursor: pointer; border: none; border-radius: 5px; color: white; margin: 5px; font-weight: bold; }
         .btn-save { background: #007bff; }
-        /* Seção do Dashboard de Histórico */
         .history-section { margin-top: 40px; padding-top: 20px; border-top: 2px solid #ddd; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background: #eee; }
+
+        /* Ajuste para telas pequenas */
+        @media (max-width: 600px) {
+            body { padding: 5px; }
+            .container { padding: 10px; }
+            .row { flex-direction: column; align-items: stretch; }
+            .flex-grow { width: 100%; }
+            table { font-size: 0.7em; }
+        }
     </style>
 </head>
 <body>
@@ -47,6 +56,14 @@
             </thead>
             <tbody></tbody>
         </table>
+    </div>
+    
+    <div style="text-align: center; margin-top: 20px;">
+        <a href="https://docs.google.com/spreadsheets/d/1IAR6Wzgvp3jbNjlmh1t7-5mLeqV744ZfLKeIh6W98YY/edit" 
+           target="_blank" 
+           style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+           📊 Acessar Planilha de Controle
+        </a>
     </div>
 </div>
 
@@ -89,7 +106,6 @@
    async function salvarParaPlanilha() {
     const problemaCentral = document.getElementById('efeito').value;
     
-    // Monta o objeto com a propriedade 'items' conforme o script espera
     const listaParaEnviar = Array.from(document.querySelectorAll('.category-box')).map(box => ({
         data: new Date().toLocaleDateString(),
         problema: problemaCentral,
@@ -102,36 +118,52 @@
 
     await fetch(API_URL, {
         method: 'POST',
-        body: JSON.stringify({ items: listaParaEnviar }) // Envia como 'items'
+        body: JSON.stringify({ items: listaParaEnviar })
     });
     alert("Salvo com sucesso!");
     carregarHistorico();
 }
 
    async function carregarHistorico() {
+    const btn = document.querySelector('button[onclick="carregarHistorico()"]');
+    const textoOriginal = btn.innerText;
+    
+    // Inicia o estado de carregamento
+    btn.innerText = "Carregando...";
+    btn.disabled = true;
+
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbygQpzRu8MEYZSqbaknWjwuSGL8QdHZXcXl42WlWC7xig_dNMb9t5eC7G9gklIiqMgQug/exec";
-    const response = await fetch(SCRIPT_URL);
-    const data = await response.json();
     
-    const tbody = document.querySelector('#history-table tbody');
-    tbody.innerHTML = '';
-    
-    data.forEach(item => {
-    tbody.innerHTML += `<tr>
-        <td>${item.data}</td>
-        <td>${item.problema}</td> 
-        <td>${item.cat}</td>
-        <td>${item.causa}</td>
-        <td>${item.acao}</td>
-        <td>
-            <select onchange="atualizarStatus(${item.id}, this.value)">
-                <option ${item.status == 'Pendente' ? 'selected' : ''}>Pendente</option>
-                <option ${item.status == 'Em Andamento' ? 'selected' : ''}>Em Andamento</option>
-                <option ${item.status == 'Concluído' ? 'selected' : ''}>Concluído</option>
-            </select>
-        </td>
-    </tr>`;
-});
+    try {
+        const response = await fetch(SCRIPT_URL);
+        const data = await response.json();
+        
+        const tbody = document.querySelector('#history-table tbody');
+        tbody.innerHTML = '';
+        
+        data.forEach(item => {
+            tbody.innerHTML += `<tr>
+                <td>${item.data}</td>
+                <td>${item.problema}</td> 
+                <td>${item.cat}</td>
+                <td>${item.causa}</td>
+                <td>${item.acao}</td>
+                <td>
+                    <select onchange="atualizarStatus(${item.id}, this.value)">
+                        <option ${item.status == 'Pendente' ? 'selected' : ''}>Pendente</option>
+                        <option ${item.status == 'Em Andamento' ? 'selected' : ''}>Em Andamento</option>
+                        <option ${item.status == 'Concluído' ? 'selected' : ''}>Concluído</option>
+                    </select>
+                </td>
+            </tr>`;
+        });
+    } catch (error) {
+        alert("Erro ao carregar histórico. Tente novamente.");
+    } finally {
+        // Restaura o botão após carregar ou dar erro
+        btn.innerText = textoOriginal;
+        btn.disabled = false;
+    }
 }
 
 async function atualizarStatus(id, novoStatus) {
@@ -143,27 +175,10 @@ async function atualizarStatus(id, novoStatus) {
     alert("Status atualizado!");
 }
 
-    // Inicialização
     window.onload = () => {
         atualizarGrafico();
     };
 </script>
-
-<div class="history-section">
-        <h3>Histórico de Ações (Direto da Planilha)</h3>
-        <table id="history-table">
-            <!-- ... seu código de tabela ... -->
-        </table>
-
-        <!-- Cole o código do botão aqui -->
-        <div style="text-align: center; margin-top: 20px;">
-            <a href="https://docs.google.com/spreadsheets/d/1IAR6Wzgvp3jbNjlmh1t7-5mLeqV744ZfLKeIh6W98YY/edit" 
-               target="_blank" 
-               style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-               📊 Acessar Planilha de Controle
-            </a>
-        </div>
-    </div>
 
 <footer style="text-align: center; margin-top: 50px; padding: 20px; color: #666; font-size: 0.9em; border-top: 1px solid #ddd;">
     <p>Desenvolvido por: <strong>militão tech solutions</strong></p>
